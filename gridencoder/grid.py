@@ -120,7 +120,7 @@ class GridEncoder(nn.Module):
         offsets.append(offset)
         offsets = torch.from_numpy(np.array(offsets, dtype=np.int32))
         self.register_buffer('offsets', offsets)
-        
+
         self.n_params = offsets[-1] * level_dim
 
         # parameters

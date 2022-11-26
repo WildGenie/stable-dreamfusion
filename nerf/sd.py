@@ -23,18 +23,21 @@ class StableDiffusion(nn.Module):
         try:
             with open('./TOKEN', 'r') as f:
                 self.token = f.read().replace('\n', '') # remove the last \n!
-                print(f'[INFO] loaded hugging face access token from ./TOKEN!')
+                print('[INFO] loaded hugging face access token from ./TOKEN!')
         except FileNotFoundError as e:
             self.token = True
-            print(f'[INFO] try to load hugging face access token from the default place, make sure you have run `huggingface-cli login`.')
-        
+            print(
+                '[INFO] try to load hugging face access token from the default place, make sure you have run `huggingface-cli login`.'
+            )
+
+
         self.device = device
         self.num_train_timesteps = 1000
         self.min_step = int(self.num_train_timesteps * 0.02)
         self.max_step = int(self.num_train_timesteps * 0.98)
 
-        print(f'[INFO] loading stable diffusion...')
-                
+        print('[INFO] loading stable diffusion...')
+
         # 1. Load the autoencoder model which will be used to decode the latents into image space. 
         self.vae = AutoencoderKL.from_pretrained("runwayml/stable-diffusion-v1-5", subfolder="vae", use_auth_token=self.token).to(self.device)
 
@@ -49,7 +52,7 @@ class StableDiffusion(nn.Module):
         self.scheduler = PNDMScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=self.num_train_timesteps)
         self.alphas = self.scheduler.alphas_cumprod.to(self.device) # for convenience
 
-        print(f'[INFO] loaded stable diffusion!')
+        print('[INFO] loaded stable diffusion!')
 
     def get_text_embeds(self, prompt, negative_prompt):
         # prompt, negative_prompt: [str]
@@ -126,7 +129,7 @@ class StableDiffusion(nn.Module):
         self.scheduler.set_timesteps(num_inference_steps)
 
         with torch.autocast('cuda'):
-            for i, t in enumerate(self.scheduler.timesteps):
+            for t in self.scheduler.timesteps:
                 # expand the latents if we are doing classifier-free guidance to avoid doing two forward passes.
                 latent_model_input = torch.cat([latents] * 2)
 
@@ -140,7 +143,7 @@ class StableDiffusion(nn.Module):
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents)['prev_sample']
-        
+
         return latents
 
     def decode_latents(self, latents):
@@ -160,9 +163,7 @@ class StableDiffusion(nn.Module):
         imgs = 2 * imgs - 1
 
         posterior = self.vae.encode(imgs).latent_dist
-        latents = posterior.sample() * 0.18215
-
-        return latents
+        return posterior.sample() * 0.18215
 
     def prompt_to_img(self, prompts, negative_prompts='', height=512, width=512, num_inference_steps=50, guidance_scale=7.5, latents=None):
 
