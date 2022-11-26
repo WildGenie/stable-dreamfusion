@@ -18,9 +18,14 @@ class MLP(nn.Module):
         self.dim_hidden = dim_hidden
         self.num_layers = num_layers
 
-        net = []
-        for l in range(num_layers):
-            net.append(nn.Linear(self.dim_in if l == 0 else self.dim_hidden, self.dim_out if l == num_layers - 1 else self.dim_hidden, bias=bias))
+        net = [
+            nn.Linear(
+                self.dim_in if l == 0 else self.dim_hidden,
+                self.dim_out if l == num_layers - 1 else self.dim_hidden,
+                bias=bias,
+            )
+            for l in range(num_layers)
+        ]
 
         self.net = nn.ModuleList(net)
     
@@ -67,11 +72,9 @@ class NeRFNetwork(NeRFRenderer):
     # add a density blob to the scene center
     def gaussian(self, x):
         # x: [B, N, 3]
-        
-        d = (x ** 2).sum(-1)
-        g = 5 * torch.exp(-d / (2 * 0.2 ** 2))
 
-        return g
+        d = (x ** 2).sum(-1)
+        return 5 * torch.exp(-d / (2 * 0.2 ** 2))
 
     def common_forward(self, x):
         # x: [N, 3], in [-bound, bound]
@@ -158,13 +161,10 @@ class NeRFNetwork(NeRFRenderer):
     def background(self, d):
 
         h = self.encoder_bg(d) # [N, C]
-        
+
         h = self.bg_net(h)
 
-        # sigmoid activation for rgb
-        rgbs = torch.sigmoid(h)
-
-        return rgbs
+        return torch.sigmoid(h)
 
     # optimizer utils
     def get_params(self, lr):

@@ -199,7 +199,7 @@ class _march_rays_train(Function):
         if not rays_o.is_cuda: rays_o = rays_o.cuda()
         if not rays_d.is_cuda: rays_d = rays_d.cuda()
         if not density_bitfield.is_cuda: density_bitfield = density_bitfield.cuda()
-        
+
         rays_o = rays_o.contiguous().view(-1, 3)
         rays_d = rays_d.contiguous().view(-1, 3)
         density_bitfield = density_bitfield.contiguous()
@@ -213,7 +213,7 @@ class _march_rays_train(Function):
             if align > 0:
                 mean_count += align - mean_count % align
             M = mean_count
-        
+
         xyzs = torch.zeros(M, 3, dtype=rays_o.dtype, device=rays_o.device)
         dirs = torch.zeros(M, 3, dtype=rays_o.dtype, device=rays_o.device)
         deltas = torch.zeros(M, 2, dtype=rays_o.dtype, device=rays_o.device)
@@ -221,12 +221,12 @@ class _march_rays_train(Function):
 
         if step_counter is None:
             step_counter = torch.zeros(2, dtype=torch.int32, device=rays_o.device) # point counter, ray counter
-        
+
         if perturb:
             noises = torch.rand(N, dtype=rays_o.dtype, device=rays_o.device)
         else:
             noises = torch.zeros(N, dtype=rays_o.dtype, device=rays_o.device)
-        
+
         get_backend().march_rays_train(rays_o, rays_d, density_bitfield, bound, dt_gamma, max_steps, N, C, H, M, nears, fars, xyzs, dirs, deltas, rays, step_counter, noises) # m is the actually used points number
 
         #print(step_counter, M)
@@ -331,10 +331,10 @@ class _march_rays(Function):
             dirs: float, [n_alive * n_step, 3], all generated points' view dirs.
             deltas: float, [n_alive * n_step, 2], all generated points' deltas (here we record two deltas, the first is for RGB, the second for depth).
         '''
-        
+
         if not rays_o.is_cuda: rays_o = rays_o.cuda()
         if not rays_d.is_cuda: rays_d = rays_d.cuda()
-        
+
         rays_o = rays_o.contiguous().view(-1, 3)
         rays_d = rays_d.contiguous().view(-1, 3)
 
@@ -342,7 +342,7 @@ class _march_rays(Function):
 
         if align > 0:
             M += align - (M % align)
-        
+
         xyzs = torch.zeros(M, 3, dtype=rays_o.dtype, device=rays_o.device)
         dirs = torch.zeros(M, 3, dtype=rays_o.dtype, device=rays_o.device)
         deltas = torch.zeros(M, 2, dtype=rays_o.dtype, device=rays_o.device) # 2 vals, one for rgb, one for depth

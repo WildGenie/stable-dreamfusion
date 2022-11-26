@@ -44,9 +44,7 @@ def sample_pdf(bins, weights, n_samples, det=False):
     denom = (cdf_g[..., 1] - cdf_g[..., 0])
     denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
     t = (u - cdf_g[..., 0]) / denom
-    samples = bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
-
-    return samples
+    return bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
 
 @torch.cuda.amp.autocast(enabled=False)
 def near_far_from_bound(rays_o, rays_d, bound, type='cube', min_near=0.05):
@@ -228,7 +226,7 @@ class NeRFRenderer(nn.Module):
             # masked query 
             xyzs = xyzs.view(-1, 3)
             mask = (mask > 0).view(-1)
-            
+
             sigmas = torch.zeros(h * w, device=device, dtype=torch.float32)
             feats = torch.zeros(h * w, 3, device=device, dtype=torch.float32)
 
@@ -248,7 +246,7 @@ class NeRFRenderer(nn.Module):
 
                 sigmas[mask] = torch.cat(all_sigmas, dim=0)
                 feats[mask] = torch.cat(all_feats, dim=0)
-            
+
             sigmas = sigmas.view(h, w, 1)
             feats = feats.view(h, w, -1)
             mask = mask.view(h, w)
@@ -301,11 +299,11 @@ class NeRFRenderer(nn.Module):
             print(f'[INFO] writing obj mesh to {obj_file}')
             with open(obj_file, "w") as fp:
                 fp.write(f'mtllib {name}mesh.mtl \n')
-                
+
                 print(f'[INFO] writing vertices {v_np.shape}')
                 for v in v_np:
                     fp.write(f'v {v[0]} {v[1]} {v[2]} \n')
-            
+
                 print(f'[INFO] writing vertices texture coords {vt_np.shape}')
                 for v in vt_np:
                     fp.write(f'vt {v[0]} {1 - v[1]} \n') 
@@ -442,7 +440,7 @@ class NeRFRenderer(nn.Module):
 
         # calculate weight_sum (mask)
         weights_sum = weights.sum(dim=-1) # [N]
-        
+
         # calculate depth 
         ori_z_vals = ((z_vals - nears) / (fars - nears)).clamp(0, 1)
         depth = torch.sum(weights * ori_z_vals, dim=-1)
@@ -457,7 +455,7 @@ class NeRFRenderer(nn.Module):
             bg_color = self.background(rays_d.reshape(-1, 3)) # [N, 3]
         elif bg_color is None:
             bg_color = 1
-            
+
         image = image + (1 - weights_sum).unsqueeze(-1) * bg_color
 
         image = image.view(*prefix, 3)
@@ -649,36 +647,25 @@ class NeRFRenderer(nn.Module):
         # rays_o, rays_d: [B, N, 3], assumes B == 1
         # return: pred_rgb: [B, N, 3]
 
-        if self.cuda_ray:
-            _run = self.run_cuda
-        else:
-            _run = self.run
-
+        _run = self.run_cuda if self.cuda_ray else self.run
         B, N = rays_o.shape[:2]
+        if not staged or self.cuda_ray:
+            return _run(rays_o, rays_d, **kwargs)
+
         device = rays_o.device
 
-        # never stage when cuda_ray
-        if staged and not self.cuda_ray:
-            depth = torch.empty((B, N), device=device)
-            image = torch.empty((B, N, 3), device=device)
-            weights_sum = torch.empty((B, N), device=device)
+        depth = torch.empty((B, N), device=device)
+        image = torch.empty((B, N, 3), device=device)
+        weights_sum = torch.empty((B, N), device=device)
 
-            for b in range(B):
-                head = 0
-                while head < N:
-                    tail = min(head + max_ray_batch, N)
-                    results_ = _run(rays_o[b:b+1, head:tail], rays_d[b:b+1, head:tail], **kwargs)
-                    depth[b:b+1, head:tail] = results_['depth']
-                    weights_sum[b:b+1, head:tail] = results_['weights_sum']
-                    image[b:b+1, head:tail] = results_['image']
-                    head += max_ray_batch
-            
-            results = {}
-            results['depth'] = depth
-            results['image'] = image
-            results['weights_sum'] = weights_sum
+        for b in range(B):
+            head = 0
+            while head < N:
+                tail = min(head + max_ray_batch, N)
+                results_ = _run(rays_o[b:b+1, head:tail], rays_d[b:b+1, head:tail], **kwargs)
+                depth[b:b+1, head:tail] = results_['depth']
+                weights_sum[b:b+1, head:tail] = results_['weights_sum']
+                image[b:b+1, head:tail] = results_['image']
+                head += max_ray_batch
 
-        else:
-            results = _run(rays_o, rays_d, **kwargs)
-
-        return results
+        return {'depth': depth, 'image': image, 'weights_sum': weights_sum}

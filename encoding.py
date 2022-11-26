@@ -6,7 +6,7 @@ class FreqEncoder_torch(nn.Module):
     def __init__(self, input_dim, max_freq_log2, N_freqs,
                  log_sampling=True, include_input=True,
                  periodic_fns=(torch.sin, torch.cos)):
-    
+
         super().__init__()
 
         self.input_dim = input_dim
@@ -34,12 +34,8 @@ class FreqEncoder_torch(nn.Module):
 
         for i in range(len(self.freq_bands)):
             freq = self.freq_bands[i]
-            for p_fn in self.periodic_fns:
-                out.append(p_fn(input * freq))
-
-        out = torch.cat(out, dim=-1)
-
-        return out
+            out.extend(p_fn(input * freq) for p_fn in self.periodic_fns)
+        return torch.cat(out, dim=-1)
 
 def get_encoder(encoding, input_dim=3, 
                 multires=6, 

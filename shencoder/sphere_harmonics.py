@@ -21,7 +21,7 @@ class _sh_encoder(Function):
         inputs = inputs.contiguous()
         B, input_dim = inputs.shape # batch size, coord dim
         output_dim = degree ** 2
-        
+
         outputs = torch.empty(B, output_dim, dtype=inputs.dtype, device=inputs.device)
 
         if calc_grad_inputs:
